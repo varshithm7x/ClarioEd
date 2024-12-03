@@ -37,9 +37,9 @@ const App: FC = () => {
             
             {/* Protected Routes */}
             <Route
-              path="/dashboard/student/*"
+              path="/dashboard/student"
               element={
-                <ProtectedRoute userType="student">
+                <ProtectedRoute>
                   <StudentDashboard />
                 </ProtectedRoute>
               }
@@ -48,7 +48,14 @@ const App: FC = () => {
             <Route path="/dashboard/student/settings" element={<Settings userType="student" />} />
             
             {/* Tutor Dashboard Routes */}
-            <Route path="/dashboard/tutor" element={<TutorDashboard />} />
+            <Route
+              path="/dashboard/tutor"
+              element={
+                <ProtectedRoute>
+                  <TutorDashboard />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/dashboard/tutor/answer/:questionId" element={<QuestionAnswer />} />
             <Route path="/dashboard/tutor/profile" element={<Profile userType="tutor" />} />
             <Route path="/dashboard/tutor/settings" element={<Settings userType="tutor" />} />

@@ -12,6 +12,7 @@ import {
 } from 'firebase/auth';
 import { auth, db } from '../config/firebase';
 import { doc, setDoc, getDoc, collection } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 
 interface UserData {
   email: string | null;
@@ -45,6 +46,7 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   const signUp = async (email: string, password: string, userData: Partial<UserData>) => {
     try {
@@ -58,6 +60,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: new Date().toISOString(),
         ...userData
       });
+
+      if (userData.userType === 'student') {
+        navigate('/dashboard/student');
+      } else if (userData.userType === 'tutor') {
+        navigate('/dashboard/tutor');
+      }
     } catch (error) {
       console.error('Error signing up:', error);
       throw error;
@@ -66,18 +74,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      const userData = userDoc.data() as UserData;
+
+      if (userData.userType === 'student') {
+        navigate('/dashboard/student');
+      } else if (userData.userType === 'tutor') {
+        navigate('/dashboard/tutor');
+      }
     } catch (error) {
       console.error('Error signing in:', error);
       throw error;
     }
   };
 
-  const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
+  const handleSocialSignIn = async (user: User, provider: string) => {
     try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       
       if (!userDoc.exists()) {
@@ -87,7 +100,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: new Date().toISOString(),
           userType: 'student' // default type
         });
+        navigate('/dashboard/student');
+      } else {
+        const userData = userDoc.data() as UserData;
+        if (userData.userType === 'student') {
+          navigate('/dashboard/student');
+        } else if (userData.userType === 'tutor') {
+          navigate('/dashboard/tutor');
+        }
       }
+    } catch (error) {
+      console.error(`Error signing in with ${provider}:`, error);
+      throw error;
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      await handleSocialSignIn(result.user, 'Google');
     } catch (error) {
       console.error('Error signing in with Google:', error);
       throw error;
@@ -98,17 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const provider = new GithubAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      
-      if (!userDoc.exists()) {
-        await setDoc(doc(db, 'users', user.uid), {
-          email: user.email,
-          name: user.displayName,
-          createdAt: new Date().toISOString(),
-          userType: 'student' // default type
-        });
-      }
+      await handleSocialSignIn(result.user, 'Github');
     } catch (error) {
       console.error('Error signing in with Github:', error);
       throw error;
@@ -119,17 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const provider = new FacebookAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      
-      if (!userDoc.exists()) {
-        await setDoc(doc(db, 'users', user.uid), {
-          email: user.email,
-          name: user.displayName,
-          createdAt: new Date().toISOString(),
-          userType: 'student' // default type
-        });
-      }
+      await handleSocialSignIn(result.user, 'Facebook');
     } catch (error) {
       console.error('Error signing in with Facebook:', error);
       throw error;
@@ -139,6 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logOut = async () => {
     try {
       await signOut(auth);
+      navigate('/');
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;
@@ -146,8 +159,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
-      setCurrentUser(user);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            setCurrentUser(user);
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+      } else {
+        setCurrentUser(null);
+      }
       setLoading(false);
     });
 
