@@ -5,7 +5,7 @@ import DashboardLayout from '../../components/dashboard/DashboardLayout';
 
 const StudentDashboard: FC = () => {
   return (
-    <DashboardLayout userType="student">
+    <DashboardLayout userType="student" children={undefined}>
       {/* Your dashboard content */}
     </DashboardLayout>
   );
