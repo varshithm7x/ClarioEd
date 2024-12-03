@@ -1,0 +1,1 @@
+// Remove this file since we don't need to modify React's types
